@@ -30,7 +30,6 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    # needs: test
     permissions:
       contents: read
     steps:
@@ -46,13 +45,26 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       - name: Build with Gradle Wrapper
         run: ./gradlew clean build
-      - name: Build & push Docker image
+
+      # Build & push Docker images for api-gateway
+      - name: Build & push API Gateway Docker image
         uses: mr-smithers-excellent/docker-build-push@v6
         with:
-          image: lyes97/neoinvo-pdp
+          image: lyes97/neoinvo-api-gateway
           tags: latest
           registry: docker.io
-          dockerfile: Dockerfile
+          dockerfile: api-gateway/Dockerfile
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Build & push Docker images for service-auth
+      - name: Build & push Auth Service Docker image
+        uses: mr-smithers-excellent/docker-build-push@v6
+        with:
+          image: lyes97/neoinvo-service-auth
+          tags: latest
+          registry: docker.io
+          dockerfile: service-auth/Dockerfile
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
@@ -76,17 +88,59 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-      - name: Deploy Docker image on VPS
+
+      - name: Set up Docker and Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Deploy Docker containers on VPS
         run: |
           ssh -o StrictHostKeyChecking=no lyes@195.35.24.85 << 'EOF'
-            docker pull lyes97/neoinvo-pdp:latest
-
-            docker stop springboot-app || true
-            docker rm springboot-app || true
-
-            docker run -d --restart unless-stopped --name springboot-app -p 8080:8080 lyes97/neoinvo-pdp:latest
+            # Pull the latest images for each service
+            docker pull lyes97/neoinvo-api-gateway:latest
+            docker pull lyes97/neoinvo-service-auth:latest
+            docker pull mysql:8.3
+          
+            # Create Docker network if not exist
+            docker network inspect neoinvo-net || docker network create neoinvo-net
+          
+            # Stop and remove existing containers
+            docker stop api-gateway || true
+            docker rm api-gateway || true
+            docker stop service-auth || true
+            docker rm service-auth || true
+            docker stop mysql-auth || true
+            docker rm mysql-auth || true
+          
+            # Create and start MySQL container
+            docker run -d \
+              --name mysql-auth \
+              --network neoinvo-net \
+              -e MYSQL_ROOT_PASSWORD=StrongRootPass123 \
+              -e MYSQL_DATABASE=neoinvo_auth \
+              -e MYSQL_USER=neoinvo_user \
+              -e MYSQL_PASSWORD=MotDePasseFort@123 \
+              -p 3306:3306 \
+              --restart unless-stopped \
+              mysql:8.3
+          
+            # Run the API Gateway
+            docker run -d \
+              --name api-gateway \
+              --network neoinvo-net \
+              -p 8080:8080 \
+              lyes97/neoinvo-api-gateway:latest
+          
+            # Run the Auth Service
+            docker run -d \
+              --name service-auth \
+              --network neoinvo-net \
+              -p 8081:8081 \
+              lyes97/neoinvo-service-auth:latest
           EOF
