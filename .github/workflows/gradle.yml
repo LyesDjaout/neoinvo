@@ -43,8 +43,15 @@ jobs:
           distribution: 'temurin'
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-      - name: Build with Gradle Wrapper
-        run: ./gradlew clean build -x test
+      - name: Build application JARs
+        run: |
+          ./gradlew :api-gateway:clean :api-gateway:bootJar
+          ./gradlew :service-auth:clean :service-auth:bootJar
+          ls -la api-gateway/build/libs/ service-auth/build/libs/ # Vérification
+          echo "Contenu de api-gateway/build/libs/"
+          ls -la api-gateway/build/libs/
+          echo "Contenu de service-auth/build/libs/"
+          ls -la service-auth/build/libs/
 
       # Build & push Docker images for api-gateway
       - name: Build & push API Gateway Docker image
