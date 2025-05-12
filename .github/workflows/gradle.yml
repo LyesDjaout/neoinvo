@@ -43,17 +43,13 @@ jobs:
           distribution: 'temurin'
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-      - name: Build application JARs
+      - name: Prepare for Docker build
         run: |
-          ./gradlew :api-gateway:clean :api-gateway:bootJar
-          ./gradlew :service-auth:clean :service-auth:bootJar
-          ls -la api-gateway/build/libs/ service-auth/build/libs/ # Vérification
-          echo "Contenu de api-gateway/build/libs/"
-          ls -la api-gateway/build/libs/
-          echo "Contenu de service-auth/build/libs/"
-          ls -la service-auth/build/libs/
+          # Copie le JAR à la racine du contexte Docker
+          cp api-gateway/build/libs/api-gateway-0.0.1-SNAPSHOT.jar api-gateway/app.jar
+          echo "Fichier préparé pour Docker:"
+          ls -la api-gateway/
 
-      # Build & push Docker images for api-gateway
       - name: Build & push API Gateway Docker image
         uses: mr-smithers-excellent/docker-build-push@v6
         with:
@@ -61,6 +57,7 @@ jobs:
           tags: latest
           registry: docker.io
           dockerfile: api-gateway/Dockerfile
+          build-context: api-gateway
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
