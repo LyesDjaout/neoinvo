@@ -30,47 +30,54 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Set executable permissions for gradlew
-        run: chmod +x gradlew
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-      - name: Prepare for Docker build
-        run: |
-          # Copie le JAR à la racine du contexte Docker
-          cp api-gateway/build/libs/api-gateway-0.0.1-SNAPSHOT.jar api-gateway/app.jar
-          echo "Fichier préparé pour Docker:"
-          ls -la api-gateway/
 
-      - name: Build & push API Gateway Docker image
+      - name: Build JARs with Gradle
+        run: |
+          ./gradlew :api-gateway:clean :api-gateway:bootJar -x test
+          ./gradlew :service-auth:clean :service-auth:bootJar -x test
+          ls -la api-gateway/build/libs/ service-auth/build/libs/
+
+      - name: Verify JAR files exist
+        run: |
+          [ -f "api-gateway/build/libs/api-gateway-0.0.1-SNAPSHOT.jar" ] || { echo "API Gateway JAR not found"; exit 1; }
+          [ -f "service-auth/build/libs/service-auth-0.0.1-SNAPSHOT.jar" ] || { echo "Service Auth JAR not found"; exit 1; }
+
+      - name: Prepare Docker context
+        run: |
+          mkdir -p api-gateway/docker-libs service-auth/docker-libs
+          cp api-gateway/build/libs/api-gateway-*.jar api-gateway/docker-libs/app.jar
+          cp service-auth/build/libs/service-auth-*.jar service-auth/docker-libs/app.jar
+          ls -la api-gateway/docker-libs/ service-auth/docker-libs/
+
+      - name: Build & push API Gateway
         uses: mr-smithers-excellent/docker-build-push@v6
         with:
           image: lyes97/neoinvo-api-gateway
           tags: latest
-          registry: docker.io
           dockerfile: api-gateway/Dockerfile
-          build-context: api-gateway
+          build-context: api-gateway/docker-libs
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ''
 
-      # Build & push Docker images for service-auth
-      - name: Build & push Auth Service Docker image
+      - name: Build & push Auth Service
         uses: mr-smithers-excellent/docker-build-push@v6
         with:
           image: lyes97/neoinvo-service-auth
           tags: latest
-          registry: docker.io
           dockerfile: service-auth/Dockerfile
+          build-context: service-auth/docker-libs
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ''
 
   dependency-submission:
     runs-on: ubuntu-latest
