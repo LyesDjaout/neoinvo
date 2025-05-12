@@ -33,13 +33,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Correction du problème de permission
+      - name: Set Gradlew executable
+        run: |
+          chmod +x gradlew
+          chmod +x api-gateway/gradlew
+          chmod +x service-auth/gradlew
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build JARs with Gradle
+      - name: Build JARs
         run: |
           ./gradlew :api-gateway:clean :api-gateway:bootJar -x test
           ./gradlew :service-auth:clean :service-auth:bootJar -x test
