@@ -142,11 +142,11 @@ jobs:
             docker-compose --env-file .env up -d mysql-auth
 
             echo "⏳ Attente que MySQL soit prêt..."
-            timeout 300 bash -c 'until docker-compose exec -T mysql-auth mysqladmin ping -uroot -p$MYSQL_ROOT_PASSWORD --silent; do
+            timeout 300 bash -c 'until docker exec neoinvo-deploy_mysql-auth_1 mysqladmin ping -uroot -p$MYSQL_ROOT_PASSWORD --silent; do
               echo "Waiting for MySQL to be healthy..."
               sleep 5
             done' || (echo "MySQL failed to start"; exit 1)
 
-            echo "✅ MySQL ready. Lancement de api-gateway et service-auth..."
+            echo "✅ MySQL prêt. Lancement des autres services..."
             docker-compose --env-file .env up -d api-gateway service-auth
           EOF
