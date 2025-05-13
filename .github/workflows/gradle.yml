@@ -142,5 +142,5 @@ jobs:
               echo "Waiting for MySQL to be ready..."
               sleep 10
             done' || (echo "MySQL failed to start"; exit 1)
-            docker-compose up -d --no-recreate
+            docker-compose up -d api-gateway service-auth
           EOF
