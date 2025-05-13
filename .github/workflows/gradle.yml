@@ -112,22 +112,19 @@ jobs:
 
       - name: Deploy using Docker Compose on VPS
         run: |
-          ssh -o StrictHostKeyChecking=no lyes@195.35.24.85 << 'EOF'
+          ssh -o StrictHostKeyChecking=no lyes@195.35.24.85 << EOF
             # Pull latest Docker images
             docker pull lyes97/neoinvo-api-gateway:latest
             docker pull lyes97/neoinvo-service-auth:latest
             docker pull mysql:8.3
 
-            # Create folder for deployment
+            # Create or clean deployment folder
             mkdir -p ~/neoinvo-deploy
-          
           EOF
 
-      - name: Copy docker-compose.yml to VPS
-        run: scp docker-compose.yml lyes@195.35.24.85:~/neoinvo-deploy/
-
-      - name: Copy .env to VPS
-        run: scp .env lyes@195.35.24.85:~/neoinvo-deploy/
+      - name: Copy deployment files to VPS
+        run: |
+          scp docker-compose.yml .env lyes@195.35.24.85:~/neoinvo-deploy/
 
       - name: Launch Docker Compose remotely
         run: |
@@ -135,20 +132,21 @@ jobs:
             set -e
             cd ~/neoinvo-deploy
 
-            export MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+            echo "=== Vérification du .env ==="
+            cat .env
 
-            docker ps --format '{{.ID}} {{.Ports}}' | grep -E '8080|3306' | awk '{print \$1}' | xargs -r docker stop || true
+            echo "Arrêt des conteneurs existants..."
             docker-compose down || true
 
-            # Démarrage de mysql-auth avec .env
+            echo "Lancement de mysql-auth..."
             docker-compose --env-file .env up -d mysql-auth
 
-            # Attente que mysql soit prêt
-            timeout 300 bash -c 'until docker-compose exec -T mysql-auth mysqladmin ping -uroot --password=$MYSQL_ROOT_PASSWORD --silent; do
-              echo "Waiting for MySQL to be ready..."
-              sleep 10
+            echo "⏳ Attente que MySQL soit prêt..."
+            timeout 300 bash -c 'until docker-compose exec -T mysql-auth mysqladmin ping -uroot -p$MYSQL_ROOT_PASSWORD --silent; do
+              echo "Waiting for MySQL to be healthy..."
+              sleep 5
             done' || (echo "MySQL failed to start"; exit 1)
 
-            # Lancement de tous les autres conteneurs
+            echo "✅ MySQL ready. Lancement de api-gateway et service-auth..."
             docker-compose --env-file .env up -d api-gateway service-auth
           EOF
