@@ -132,18 +132,12 @@ jobs:
       - name: Launch Docker Compose remotely
         run: |
           ssh -o StrictHostKeyChecking=no lyes@195.35.24.85 << 'EOF'
-            # Install Docker Compose if not present
-            if ! command -v docker-compose &> /dev/null; then
-              sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-              sudo chmod +x /usr/local/bin/docker-compose
-            fi
             cd ~/neoinvo-deploy
-            docker-compose down
+            docker-compose down || true
             docker-compose up -d mysql-auth
-            while ! docker-compose exec -T mysql-auth mysqladmin ping -h localhost -u root -p$MYSQL_ROOT_PASSWORD --silent; do
+            timeout 300 bash -c 'until docker-compose exec -T mysql-auth mysqladmin ping -uroot -p$$MYSQL_ROOT_PASSWORD --silent; do 
               echo "Waiting for MySQL to be ready..."
-              sleep 5
-            done
-            docker-compose up -d
+              sleep 10
+            done' || (echo "MySQL failed to start"; exit 1)
+            docker-compose up -d --no-recreate
           EOF
-
