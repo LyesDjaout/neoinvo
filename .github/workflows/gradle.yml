@@ -133,14 +133,22 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no lyes@195.35.24.85 << EOF
             set -e
-            export MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
             cd ~/neoinvo-deploy
+
+            export MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+
             docker ps --format '{{.ID}} {{.Ports}}' | grep -E '8080|3306' | awk '{print \$1}' | xargs -r docker stop || true
             docker-compose down || true
-            docker-compose up -d mysql-auth
+
+            # Démarrage de mysql-auth avec .env
+            docker-compose --env-file .env up -d mysql-auth
+
+            # Attente que mysql soit prêt
             timeout 300 bash -c 'until docker-compose exec -T mysql-auth mysqladmin ping -uroot --password=$MYSQL_ROOT_PASSWORD --silent; do
               echo "Waiting for MySQL to be ready..."
               sleep 10
             done' || (echo "MySQL failed to start"; exit 1)
-            docker-compose up -d api-gateway service-auth
+
+            # Lancement de tous les autres conteneurs
+            docker-compose --env-file .env up -d api-gateway service-auth
           EOF
