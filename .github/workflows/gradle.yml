@@ -54,7 +54,7 @@ jobs:
           tags: latest
           registry: docker.io
           context: ./api-gateway
-          dockerfile: Dockerfile
+          dockerfile: ./Dockerfile
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
@@ -66,7 +66,7 @@ jobs:
           tags: latest
           registry: docker.io
           context: ./service-auth
-          dockerfile: Dockerfile
+          dockerfile: ./Dockerfile
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
