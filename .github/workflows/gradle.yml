@@ -30,61 +30,43 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-
-      # Correction du problème de permission
-      - name: Set Gradlew executable
-        run: |
-          chmod +x gradlew
-          chmod +x api-gateway/gradlew
-          chmod +x service-auth/gradlew
-
+      - name: Set executable permissions for gradlew
+        run: chmod +x gradlew
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Build with Gradle Wrapper
+        run: ./gradlew clean build -x test
 
-      - name: Build JARs
-        run: |
-          ./gradlew :api-gateway:clean :api-gateway:bootJar -x test
-          ./gradlew :service-auth:clean :service-auth:bootJar -x test
-          ls -la api-gateway/build/libs/ service-auth/build/libs/
-
-      - name: Verify JAR files exist
-        run: |
-          [ -f "api-gateway/build/libs/api-gateway-0.0.1-SNAPSHOT.jar" ] || { echo "API Gateway JAR not found"; exit 1; }
-          [ -f "service-auth/build/libs/service-auth-0.0.1-SNAPSHOT.jar" ] || { echo "Service Auth JAR not found"; exit 1; }
-
-      - name: Prepare Docker context
-        run: |
-          mkdir -p api-gateway/docker-libs service-auth/docker-libs
-          cp api-gateway/build/libs/api-gateway-*.jar api-gateway/docker-libs/app.jar
-          cp service-auth/build/libs/service-auth-*.jar service-auth/docker-libs/app.jar
-          ls -la api-gateway/docker-libs/ service-auth/docker-libs/
-
-      - name: Build & push API Gateway
+      # Build & push Docker images for api-gateway
+      - name: Build & push API Gateway Docker image
         uses: mr-smithers-excellent/docker-build-push@v6
         with:
           image: lyes97/neoinvo-api-gateway
           tags: latest
+          registry: docker.io
           dockerfile: api-gateway/Dockerfile
-          build-context: api-gateway/docker-libs
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          registry: ''
 
-      - name: Build & push Auth Service
+      # Build & push Docker images for service-auth
+      - name: Build & push Auth Service Docker image
         uses: mr-smithers-excellent/docker-build-push@v6
         with:
           image: lyes97/neoinvo-service-auth
           tags: latest
+          registry: docker.io
           dockerfile: service-auth/Dockerfile
-          build-context: service-auth/docker-libs
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          registry: ''
 
   dependency-submission:
     runs-on: ubuntu-latest
@@ -112,53 +94,30 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Set up Docker and Docker Compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
-
-      - name: Deploy Docker containers on VPS
+      - name: Deploy using Docker Compose on VPS
         run: |
           ssh -o StrictHostKeyChecking=no lyes@195.35.24.85 << 'EOF'
-            # Pull the latest images for each service
+            # Pull latest Docker images
             docker pull lyes97/neoinvo-api-gateway:latest
             docker pull lyes97/neoinvo-service-auth:latest
             docker pull mysql:8.3
+
+            # Create folder for deployment
+            mkdir -p ~/neoinvo-deploy
           
-            # Create Docker network if not exist
-            docker network inspect neoinvo-net || docker network create neoinvo-net
-          
-            # Stop and remove existing containers
-            docker stop api-gateway || true
-            docker rm api-gateway || true
-            docker stop service-auth || true
-            docker rm service-auth || true
-            docker stop mysql-auth || true
-            docker rm mysql-auth || true
-          
-            # Create and start MySQL container
-            docker run -d \
-              --name mysql-auth \
-              --network neoinvo-net \
-              -e MYSQL_ROOT_PASSWORD=StrongRootPass123 \
-              -e MYSQL_DATABASE=neoinvo_auth \
-              -e MYSQL_USER=neoinvo_user \
-              -e MYSQL_PASSWORD=MotDePasseFort@123 \
-              -p 3306:3306 \
-              --restart unless-stopped \
-              mysql:8.3
-          
-            # Run the API Gateway
-            docker run -d \
-              --name api-gateway \
-              --network neoinvo-net \
-              -p 8080:8080 \
-              lyes97/neoinvo-api-gateway:latest
-          
-            # Run the Auth Service
-            docker run -d \
-              --name service-auth \
-              --network neoinvo-net \
-              -p 8081:8081 \
-              lyes97/neoinvo-service-auth:latest
           EOF
+
+      - name: Copy docker-compose.yml to VPS
+        run: scp docker-compose.yml lyes@195.35.24.85:~/neoinvo-deploy/
+
+      - name: Copy .env to VPS
+        run: scp .env lyes@195.35.24.85:~/neoinvo-deploy/
+
+      - name: Launch Docker Compose remotely
+        run: |
+          ssh -o StrictHostKeyChecking=no lyes@195.35.24.85 << 'EOF'
+            cd ~/neoinvo-deploy
+            docker compose down
+            docker compose up -d
+          EOF
+
