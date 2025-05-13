@@ -40,10 +40,10 @@ services:
     volumes:
       - mysql_auth_data:/var/lib/mysql
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pStrongRootPass123" ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}" ]
+      interval: 5s
+      timeout: 10s
+      retries: 20
 
 networks:
   neoinvo-net:
