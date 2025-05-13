@@ -53,8 +53,8 @@ jobs:
           image: lyes97/neoinvo-api-gateway
           tags: latest
           registry: docker.io
-          context: ./api-gateway
-          dockerfile: ./Dockerfile
+          dockerfile: Dockerfile
+          directory: ./api-gateway
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
@@ -65,8 +65,8 @@ jobs:
           image: lyes97/neoinvo-service-auth
           tags: latest
           registry: docker.io
-          context: ./service-auth
-          dockerfile: ./Dockerfile
+          dockerfile: Dockerfile
+          directory: ./service-auth
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
