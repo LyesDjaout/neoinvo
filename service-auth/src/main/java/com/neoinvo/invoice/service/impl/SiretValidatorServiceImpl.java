@@ -26,15 +26,20 @@ public class SiretValidatorServiceImpl implements SiretValidatorService {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("https://entreprise.data.gouv.fr/api/sirene/v3/etablissements/" + siret))
+                    .header("Accept", "application/json")
                     .timeout(Duration.ofSeconds(5))
                     .GET()
                     .build();
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-            return response.statusCode() == 200;
+            // Vérifier que la réponse contient bien des données d'établissement
+            return response.statusCode() == 200 &&
+                    response.body().contains("\"etablissement\"");
+
         } catch (IOException | InterruptedException e) {
-            e.printStackTrace(); // Pour le debug, à remplacer plus tard par un log
+            // Log l'erreur (à implémenter avec un vrai logger)
+            System.err.println("Erreur lors de la validation SIRET: " + e.getMessage());
             return false;
         }
     }
