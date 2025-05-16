@@ -51,12 +51,18 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public void sendSimpleEmail(String to, String subject, String body) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject(subject);
-        message.setText(body);
+    public void sendHtmlEmail(String to, String subject, String htmlContent) {
+        MimeMessage mimeMessage = mailSender.createMimeMessage();
 
-        mailSender.send(message);
+        try {
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true); // true = HTML
+
+            mailSender.send(mimeMessage);
+        } catch (MessagingException e) {
+            throw new IllegalStateException("Erreur lors de l'envoi de l'e-mail HTML", e);
+        }
     }
 }

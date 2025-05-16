@@ -28,22 +28,22 @@ public class OtpServiceImpl implements OtpService {
         String otp = String.format("%06d", random.nextInt(1_000_000));
         otpStorage.put(email, new OtpData(otp, Instant.now().plusSeconds(OTP_VALID_DURATION_SECONDS)));
 
-        // Envoi de l'OTP par email
-        String subject = "Votre code OTP pour NeoInvo";
-        String body = String.format("""
-            Bonjour,
+        String subject = "🔐 Votre code OTP pour NeoInvo";
+        String htmlBody = """
+        <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
+                <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 8px; padding: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+                    <h2 style="color: #333333;">Code de vérification OTP 🔐</h2>
+                    <p style="color: #555555;">Voici votre code de vérification à usage unique. Il est valable pendant 5 minutes :</p>
+                    <div style="font-size: 24px; font-weight: bold; margin: 20px 0; color: #007bff;">%s</div>
+                    <p style="color: #888888;">Si vous n'avez pas demandé ce code, vous pouvez ignorer cet e-mail.</p>
+                    <p style="color: #aaa; font-size: 12px; margin-top: 30px;">NeoInvo © 2025</p>
+                </div>
+            </body>
+        </html>
+        """.formatted(otp);
 
-            Voici votre code de vérification OTP valable 5 minutes :
-
-            %s
-
-            Si vous n'avez pas demandé ce code, ignorez cet email.
-
-            Cordialement,
-            L'équipe NeoInvo
-            """, otp);
-
-        emailService.sendSimpleEmail(email, subject, body);
+        emailService.sendHtmlEmail(email, subject, htmlBody);
     }
 
     @Override
