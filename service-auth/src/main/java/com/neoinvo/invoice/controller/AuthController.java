@@ -25,6 +25,11 @@ public class AuthController {
         return authService.login(request);
     }
 
+    @GetMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestParam("token") String token) {
+        return authService.verifyEmail(token);
+    }
+
     @GetMapping("/me")
     public ResponseEntity<UserMeResponse> getCurrentUser() {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();

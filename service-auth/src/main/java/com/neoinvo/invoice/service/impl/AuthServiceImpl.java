@@ -5,6 +5,7 @@ import com.neoinvo.invoice.dto.*;
 import com.neoinvo.invoice.entity.User;
 import com.neoinvo.invoice.repository.UserRepository;
 import com.neoinvo.invoice.service.AuthService;
+import com.neoinvo.invoice.service.EmailService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -13,6 +14,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.http.ResponseEntity;
 
+import java.util.Optional;
+import java.util.UUID;
+
 @Service
 public class AuthServiceImpl implements AuthService {
 
@@ -20,22 +24,25 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
+    private final EmailService emailService;
 
     public AuthServiceImpl(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager,
-            JwtUtil jwtUtil) {
+            JwtUtil jwtUtil,
+            EmailService emailService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
+        this.emailService = emailService;
     }
 
     @Override
     public ResponseEntity<?> register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
-            return ResponseEntity.badRequest().body("Error: Email is already taken!");
+            return ResponseEntity.badRequest().body("Email déjà utilisé.");
         }
 
         User user = new User();
@@ -46,9 +53,16 @@ public class AuthServiceImpl implements AuthService {
         user.setCompanyName(request.companyName());
         user.setSiret(request.siret());
 
+        user.setEmailVerified(false);
+        user.setVerificationToken(UUID.randomUUID().toString());
+
         userRepository.save(user);
 
-        return ResponseEntity.ok("User registered successfully!");
+        String verificationLink = "http://localhost:8080/auth/verify-email?token=" + user.getVerificationToken();
+
+        emailService.sendVerificationEmail(user.getEmail(), verificationLink);
+
+        return ResponseEntity.ok("Utilisateur créé. Un e-mail de vérification a été envoyé.");
     }
 
     @Override
@@ -61,12 +75,38 @@ public class AuthServiceImpl implements AuthService {
         );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
+
         String jwt = jwtUtil.generateJwtToken(authentication);
+
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        if (!user.isEmailVerified()) {
+            return ResponseEntity.status(401).body("Veuillez d'abord vérifier votre adresse e-mail.");
+        }
 
         AuthResponse response = new AuthResponse();
         response.setToken(jwt);
-        response.setMessage("Login success");
+        response.setMessage("Connexion réussie");
 
         return ResponseEntity.ok(response);
+    }
+
+    @Override
+    public ResponseEntity<?> verifyEmail(String token) {
+        Optional<User> userOpt = userRepository.findAll().stream()
+                .filter(u -> token.equals(u.getVerificationToken()))
+                .findFirst();
+
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Token invalide");
+        }
+
+        User user = userOpt.get();
+        user.setEmailVerified(true);
+        user.setVerificationToken(null);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Email vérifié avec succès.");
     }
 }

@@ -32,54 +32,45 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        System.out.println("⏳ Request path: " + request.getServletPath());
         try {
-            String path = request.getRequestURI();
-            logger.debug("🔍 Incoming request path: {}", path);
-
-            // Skip filtering on public auth endpoints
-            if (path.startsWith("/auth/login") || path.startsWith("/auth/register")) {
-                logger.debug("⏭️ Skipping JWT filter for public endpoint: {}", path);
-                filterChain.doFilter(request, response);
-                return;
-            }
-
-            String headerAuth = request.getHeader("Authorization");
-            logger.debug("🪪 Authorization header: {}", headerAuth);
-
             String jwt = parseJwt(request);
-            logger.debug("🧪 Parsed JWT: {}", jwt);
-
             if (jwt != null && jwtUtil.validateJwtToken(jwt)) {
-                logger.debug("✅ JWT is valid");
-
                 String email = jwtUtil.getUserEmailFromJwtToken(jwt);
-                logger.debug("👤 Extracted email from token: {}", email);
-
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
                 UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request));
+                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                logger.debug("🔐 SecurityContext updated with authenticated user: {}", email);
-            } else {
-                logger.warn("❌ Invalid or missing JWT token");
             }
         } catch (Exception e) {
-            logger.error("🚫 Cannot set user authentication", e);
+            logger.error("Cannot set authentication", e);
         }
-
         filterChain.doFilter(request, response);
     }
 
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        System.out.println("🔍 shouldNotFilter called on path: " + path);
+        return path.startsWith("/auth/login") ||
+                path.startsWith("/auth/register") ||
+                path.startsWith("/auth/verify-email");
+    }
+
     private String parseJwt(HttpServletRequest request) {
-        String headerAuth = request.getHeader("Authorization");
-        if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7);
+        try {
+            String headerAuth = request.getHeader("Authorization");
+            if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
+                String jwt = headerAuth.substring(7).trim();
+                return StringUtils.hasText(jwt) ? jwt : null;
+            }
+            return null;
+        } catch (Exception e) {
+            logger.error("Error parsing JWT from header", e);
+            return null;
         }
-        return null;
     }
 }
