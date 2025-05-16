@@ -1,5 +1,6 @@
 FROM eclipse-temurin:17-jdk
 
+# Installer les certificats SSL nécessaires pour HTTPS
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \

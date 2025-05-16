@@ -48,6 +48,14 @@ public class User implements UserDetails {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    public boolean isTwoFactorEnabled() {
+        return twoFactorEnabled;
+    }
+
+    public void setTwoFactorEnabled(boolean twoFactorEnabled) {
+        this.twoFactorEnabled = twoFactorEnabled;
+    }
+
     // UserDetails methods
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

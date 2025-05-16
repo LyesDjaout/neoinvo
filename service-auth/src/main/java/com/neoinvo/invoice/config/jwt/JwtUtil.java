@@ -1,4 +1,5 @@
 package com.neoinvo.invoice.config.jwt;
+
 import com.neoinvo.invoice.entity.User;
 
 import io.jsonwebtoken.*;
@@ -26,9 +27,21 @@ public class JwtUtil {
         User userPrincipal = (User) authentication.getPrincipal();
 
         return Jwts.builder()
-                .setSubject((userPrincipal.getEmail()))
+                .setSubject(userPrincipal.getEmail())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + jwtConfig.getExpirationMs()))
+                .signWith(key(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    /**
+     * Génère un JWT à partir d'une adresse email (pour OTP, par ex)
+     */
+    public String generateJwtTokenForEmail(String email) {
+        return Jwts.builder()
+                .setSubject(email)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + jwtConfig.getExpirationMs()))
                 .signWith(key(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -38,8 +51,12 @@ public class JwtUtil {
     }
 
     public String getUserEmailFromJwtToken(String token) {
-        return Jwts.parserBuilder().setSigningKey(key()).build()
-                .parseClaimsJws(token).getBody().getSubject();
+        return Jwts.parserBuilder()
+                .setSigningKey(key())
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
     }
 
     public boolean validateJwtToken(String authToken) {

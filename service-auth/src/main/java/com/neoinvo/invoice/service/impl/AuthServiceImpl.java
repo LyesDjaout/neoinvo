@@ -6,6 +6,7 @@ import com.neoinvo.invoice.entity.User;
 import com.neoinvo.invoice.repository.UserRepository;
 import com.neoinvo.invoice.service.AuthService;
 import com.neoinvo.invoice.service.EmailService;
+import com.neoinvo.invoice.service.OtpService;
 import com.neoinvo.invoice.service.SiretValidatorService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -27,6 +28,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtUtil jwtUtil;
     private final EmailService emailService;
     private final SiretValidatorService siretValidatorService;
+    private final OtpService otpService;
 
     public AuthServiceImpl(
             UserRepository userRepository,
@@ -34,13 +36,15 @@ public class AuthServiceImpl implements AuthService {
             AuthenticationManager authenticationManager,
             JwtUtil jwtUtil,
             EmailService emailService,
-            SiretValidatorService siretValidatorService) {
+            SiretValidatorService siretValidatorService,
+            OtpService otpService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.emailService = emailService;
         this.siretValidatorService = siretValidatorService;
+        this.otpService = otpService;
     }
 
     @Override
@@ -76,15 +80,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public ResponseEntity<?> login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.email(),
-                        request.password()
-                )
+                new UsernamePasswordAuthenticationToken(request.email(), request.password())
         );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        String jwt = jwtUtil.generateJwtToken(authentication);
 
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
@@ -92,6 +91,15 @@ public class AuthServiceImpl implements AuthService {
         if (!user.isEmailVerified()) {
             return ResponseEntity.status(401).body("Veuillez d'abord vérifier votre adresse e-mail.");
         }
+
+        if (user.isTwoFactorEnabled()) {
+            otpService.generateOtp(user.getEmail());
+
+            return ResponseEntity.status(202).body("OTP envoyé par email, veuillez le vérifier pour continuer.");
+        }
+
+        // Sinon pas de 2FA, générer JWT direct
+        String jwt = jwtUtil.generateJwtToken(authentication);
 
         AuthResponse response = new AuthResponse();
         response.setToken(jwt);
