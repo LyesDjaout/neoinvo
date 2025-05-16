@@ -58,7 +58,7 @@ public class AuthServiceImpl implements AuthService {
 
         userRepository.save(user);
 
-        String verificationLink = "http://localhost:8080/auth/verify-email?token=" + user.getVerificationToken();
+        String verificationLink = "http://neoinvo.com:8080/auth/verify-email?token=" + user.getVerificationToken();
 
         emailService.sendVerificationEmail(user.getEmail(), verificationLink);
 
