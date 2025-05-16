@@ -1,4 +1,4 @@
-package com.neoinvo.invoice.service.impl;
+/* package com.neoinvo.invoice.service.impl;
 
 import com.neoinvo.invoice.service.SiretValidatorService;
 import org.springframework.stereotype.Service;
@@ -42,5 +42,23 @@ public class SiretValidatorServiceImpl implements SiretValidatorService {
             System.err.println("Erreur lors de la validation SIRET: " + e.getMessage());
             return false;
         }
+    }
+}*/
+
+package com.neoinvo.invoice.service.impl;
+
+import com.neoinvo.invoice.service.SiretValidatorService;
+import org.springframework.stereotype.Service;
+
+@Service
+public class SiretValidatorServiceImpl implements SiretValidatorService {
+
+    @Override
+    public boolean isValidSiret(String siret) {
+        if (siret == null || !siret.matches("\\d{14}")) {
+            return false;
+        }
+        // Validation mockée : accepte les SIRET commençant par '1' ou '2'
+        return siret.startsWith("1") || siret.startsWith("2");
     }
 }
