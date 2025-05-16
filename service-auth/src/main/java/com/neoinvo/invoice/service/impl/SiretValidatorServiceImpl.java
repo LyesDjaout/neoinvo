@@ -1,27 +1,40 @@
 package com.neoinvo.invoice.service.impl;
 
 import com.neoinvo.invoice.service.SiretValidatorService;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 
 @Service
 public class SiretValidatorServiceImpl implements SiretValidatorService {
 
-    private final RestTemplate restTemplate = new RestTemplate();
-
     @Override
     public boolean isValidSiret(String siret) {
+        if (siret == null || !siret.matches("\\d{14}")) {
+            return false;
+        }
+
         try {
-            String url = "https://entreprise.data.gouv.fr/api/sirene/v3/etablissements/" + siret;
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .build();
 
-            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://entreprise.data.gouv.fr/api/sirene/v3/etablissements/" + siret))
+                    .timeout(Duration.ofSeconds(5))
+                    .GET()
+                    .build();
 
-            // Si 200 OK et contient un établissement, c'est valide
-            return response.getStatusCode().is2xxSuccessful()
-                    && response.getBody() != null
-                    && response.getBody().contains("\"etablissement\":");
-        } catch (Exception e) {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            return response.statusCode() == 200;
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace(); // Pour le debug, à remplacer plus tard par un log
             return false;
         }
     }
