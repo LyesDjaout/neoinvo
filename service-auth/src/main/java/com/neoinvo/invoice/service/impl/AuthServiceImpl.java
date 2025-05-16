@@ -6,6 +6,7 @@ import com.neoinvo.invoice.entity.User;
 import com.neoinvo.invoice.repository.UserRepository;
 import com.neoinvo.invoice.service.AuthService;
 import com.neoinvo.invoice.service.EmailService;
+import com.neoinvo.invoice.service.SiretValidatorService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,24 +26,31 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final EmailService emailService;
+    private final SiretValidatorService siretValidatorService;
 
     public AuthServiceImpl(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager,
             JwtUtil jwtUtil,
-            EmailService emailService) {
+            EmailService emailService,
+            SiretValidatorService siretValidatorService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.emailService = emailService;
+        this.siretValidatorService = siretValidatorService;
     }
 
     @Override
     public ResponseEntity<?> register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
             return ResponseEntity.badRequest().body("Email déjà utilisé.");
+        }
+
+        if (!siretValidatorService.isValidSiret(request.siret())) {
+            return ResponseEntity.badRequest().body("SIRET invalide.");
         }
 
         User user = new User();
